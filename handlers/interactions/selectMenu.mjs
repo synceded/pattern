@@ -30,6 +30,7 @@ export async function handleSelectMenuInteraction(interaction) {
         }
       ]
     })
+    
     const components = new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
@@ -37,11 +38,14 @@ export async function handleSelectMenuInteraction(interaction) {
           .setURL(ticketChannel.url)
           .setStyle(ButtonStyle.Link)
       )
+
     const ticketChannelInfo = await interaction.guild.channels.cache.get(process.env.MESSAGE_TICKET_CHANNEL)
     const ticketChannelMessage = await interaction.channel.messages.fetch(process.env.MESSAGE_TICKET_CHANNEL_ID)
+
     const valueEmbed = '[``📌``] - Количество обращений за всё время: ``' + (statistic.tickets_all + 1) + '``\n' +
-                  '[``👀``] - На рассмотрении: ``' + (statistic.tickets_pending + 1) + '``\n' +
-                  '[``🔒``] - Закрытых: ``' + statistic.tickets_closed + '``';
+                        '[``👀``] - На рассмотрении: ``' + (statistic.tickets_pending + 1) + '``\n' +
+                        '[``🔒``] - Закрытых: ``' + statistic.tickets_closed + '``';
+
     const embedTickets = new EmbedBuilder()
       .setTitle("Система обращений")
       .setDescription("[`👋`] Добро пожаловать! Вы попали в канал поддержки Discord проекта New Project!\n\n[`📃`] Выберите суть Вашей проблемы, и мы обязателельно постараемся Вам помочь!")
@@ -54,10 +58,20 @@ export async function handleSelectMenuInteraction(interaction) {
       )
       .setColor("#00b0f4")
       .setFooter({ text: "Состав модерации сервера" });
-    await ticketChannel.send({ content: `${interaction.user}, **\`\`Для службы поддержки\`\`** <@&1321555656083374080>` })
+
+    await ticketChannel.send({
+      content: `${interaction.user}, **\`\`Для службы поддержки\`\`** <@&1321555656083374080>`
+    })
+
     await db.query(`UPDATE discord_statistic SET tickets_all = ?, tickets_pending = ?`, [statistic.tickets_all + 1, statistic.tickets_pending + 1])
     await db.query(`INSERT INTO discord_tickets (channel_id, user_id) VALUES (?, ?)`, [ticketChannel.id, interaction.member.id])
-    await interaction.reply({ content: 'Ваше обращение было успешно создано. Нажмите на кнопку ниже!', components: [components], ephemeral: true })
+
+    const successEmbed = new EmbedBuilder()
+      .setTitle("✅ | Обращение создано")
+      .setDescription('Ваше обращение было успешно создано. Нажмите на кнопку ниже, чтобы перейти в чат!')
+      .setColor("#00b0f4");
+
+    await interaction.reply({ embeds: [successEmbed], components: [components], ephemeral: true })
     await ticketChannelMessage.edit({ embeds: [embedTickets] })    
   }
 }

@@ -9,6 +9,8 @@ import { handleOut } from './handlers/commands/out.mjs'
 import { handleProfile } from './handlers/commands/profile.mjs'
 import { handleBank } from './handlers/commands/bank.mjs'
 import { handleDaily } from './handlers/commands/daily.mjs'
+import { handleFamily, handleAutocomplete } from './handlers/commands/family.mjs'
+import { handleBinaryOption } from './handlers/commands/binary-option.mjs'
 
 import { handleButtonInteraction } from './handlers/interactions/buttons.mjs'
 import { handleSelectMenuInteraction } from './handlers/interactions/selectMenu.mjs'
@@ -20,8 +22,8 @@ client.on(Events.ClientReady, readyClient => {
 client.on(Events.GuildMemberAdd, async member => {
   const [rows] = await db.query('SELECT * FROM discord_profiles WHERE user_id = ?', [member.id])
   if(rows.length === 0){
-    await db.query('INSERT INTO discord_profiles (user_id, username) VALUES (?, ?)', [member.id], [member.displayname])
-  } else return
+    await db.query('INSERT INTO discord_profiles (user_id, username) VALUES (?, ?)', [member.id, member.displayname])
+  }
 })
 
 client.on(Events.InteractionCreate, async interaction => {
@@ -30,12 +32,15 @@ client.on(Events.InteractionCreate, async interaction => {
     if(interaction.commandName === 'daily') return await handleDaily(interaction)
     if(interaction.commandName === 'out') return await handleOut(interaction)
     if(interaction.commandName === 'profile') return await handleProfile(interaction)
+    if(interaction.commandName === 'family') return await handleFamily(interaction)
+    if(interaction.commandName === 'binary-option') return await handleBinaryOption(interaction)
   } else if(interaction.isButton()){
     await handleButtonInteraction(interaction)
   } else if(interaction.isStringSelectMenu()){
     await handleSelectMenuInteraction(interaction)
-  } else {
-    await interaction.reply({ content: 'Неизвестный вид интеракции!', ephemeral: true })
+  } else if(interaction.isAutocomplete()) return await handleAutocomplete(interaction)
+  else {
+    await interaction.reply({ embeds: [new EmbedBuilder().setDescription('Неизвестный вид интеракции!').setColor('#ff0000')], ephemeral: true })
   }
 })
 
@@ -59,7 +64,7 @@ client.on(Events.MessageCreate, async message => {
             },
             {
                name: "» Список доступных тегов",
-               value: "<@&1321092832823607306> - [GOV]; [ПРА-ВО]; [ДТЛ]; [DTL]; [CK]; [IC]; [СК]\n<@&1321092834010595348> - [FBI]; [ФБР]\n<@&1321092835528933476> - [LSPD]; [ЛСПД]; [LSSD]; [ЛССД]; [RCSD]; [РКШД]; [SFPD]; [СФПД]; [LVMPD]; [ЛВМПД]\n<@&1321092837445468180> - [ФИК]; [АНГ]; [ANG]; [VNG]; [ВНГ]\n<@&1321092839295422547> - [FD]; [ПД]\n<@&1321092840813498378> - [ЛСМЦ]; [LSMC]; [SFMC]; [СФМЦ]; [LVMC]; [ЛВМЦ]; [ТС]; [TC]\n<@&1321092842021589063> - [CNN LS]; [RLS]; [R-LS]; [РЛС]; [Р-ЛС]; [CNN SF]; [RSF]; [R-SF]; [РСФ]; [Р-СФ]; [CNN LV]; [RLV]; [R-LV]; [РЛВ]; [Р-ЛВ]\n<@&1321092843389059145> - [RM]; [РМ]\n<@&1321092844714201208> - [WMC]; [ВМС]\n<@&1321092845758582824> - [LCN]; [ЛКН]\n<@&1321092846966538312> - [YAKUZA]; [ЯКУДЗА]\n<@&1321092848287744020> - [TRB]; [ТРБ]\n<@&1321092849764270151> - [GROVE]; [ГРУВ]\n<@&1321092851186274317> - [BALLAS]; [БАЛЛАС]\n<@&1321092852486508604> - [VAGOS]; [ВАГОС]\n<@&1321092853669040209> - [AZTEC]; [АЦТЕК]\n<@&1321092856634671154> - [RIFA]; [РИФА]\n<@&1321092855002828810> - [NW]; [НВ]",
+               value: "<@&1321555638005796947> - [T1]\n<@&1321555656083374080> - [T2]",
                inline: true
             },
          )
@@ -138,7 +143,7 @@ client.on(Events.MessageCreate, async message => {
 
     await message.delete();
     await db.query("UPDATE discord_statistic SET tickets_pending = ?, tickets_closed = ?", [ statistic.tickets_pending - 1, statistic.tickets_closed + 1 ]);
-    await message.channel.send(`<@${ticketData.user_id}>, модератор ${message.author} установил вашему обращению статус "Закрыто".`);
+    await message.channel.send({ embeds: [new EmbedBuilder().setDescription(`<@${ticketData.user_id}>, модератор ${message.author} установил вашему обращению статус "Закрыто".`).setColor("#00b0f4")] });
     await db.query("UPDATE discord_tickets SET status = ? WHERE channel_id = ?", ['closed', message.channel.id]);
     await message.channel.setParent(closedTicketCategory);
     await message.channel.permissionOverwrites.edit(member, { SendMessages: false });
@@ -146,7 +151,7 @@ client.on(Events.MessageCreate, async message => {
   }
 });
 
-cron.schedule('0 0 * * *', async () => {
+cron.schedule('0 0 * * * *', async () => {
   const [rows] = await db.query('SELECT user_id, dp_bank FROM discord_profiles WHERE dp_bank > 0');
 
   for (const user of rows) {
